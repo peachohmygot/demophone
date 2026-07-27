@@ -241,17 +241,58 @@ function renderThumbs() {
   box.innerHTML = "";
   stagedImages.forEach((img, i) => {
     const d = document.createElement("div");
-    d.className = "t";
+    d.className = "t" + (i === 0 ? " cover" : "");
+
     if (img.compressing) {
       d.innerHTML = `<div class="muted" style="display:flex;align-items:center;justify-content:center;height:100%;font-size:11px">…</div>`;
-    } else {
-      d.innerHTML = `<img src="${img.url}" />
-        <button type="button" title="remove">×</button>
-        <span class="sz">${humanSize(img.size)}</span>`;
-      d.querySelector("button").onclick = () => { stagedImages.splice(i, 1); renderThumbs(); };
+      box.appendChild(d);
+      return;
     }
+
+    d.draggable = true;
+    d.dataset.index = i;
+    d.innerHTML = `<img src="${img.url}" />
+      <button type="button" class="rm" title="remove">×</button>
+      ${i === 0 ? '<span class="cover-tag">COVER</span>' : ""}
+      <span class="sz">${img.size ? humanSize(img.size) : "saved"}</span>
+      <div class="move">
+        <button type="button" class="mv" data-dir="-1" ${i === 0 ? "disabled" : ""}>◀</button>
+        <button type="button" class="mv" data-dir="1" ${i === stagedImages.length - 1 ? "disabled" : ""}>▶</button>
+      </div>`;
+
+    d.querySelector(".rm").onclick = () => { stagedImages.splice(i, 1); renderThumbs(); };
+    d.querySelectorAll(".mv").forEach((b) => {
+      b.onclick = () => move(i, i + Number(b.dataset.dir));
+    });
+
+    // Desktop drag-and-drop reordering.
+    d.addEventListener("dragstart", (e) => {
+      dragFrom = i;
+      d.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    d.addEventListener("dragend", () => d.classList.remove("dragging"));
+    d.addEventListener("dragover", (e) => { e.preventDefault(); d.classList.add("over"); });
+    d.addEventListener("dragleave", () => d.classList.remove("over"));
+    d.addEventListener("drop", (e) => {
+      e.preventDefault();
+      d.classList.remove("over");
+      if (dragFrom !== null && dragFrom !== i) move(dragFrom, i);
+      dragFrom = null;
+    });
+
     box.appendChild(d);
   });
+}
+
+let dragFrom = null;
+
+// Move a staged image to a new position; index 0 is the cover photo.
+function move(from, to) {
+  if (to < 0 || to >= stagedImages.length) return;
+  const [item] = stagedImages.splice(from, 1);
+  stagedImages.splice(to, 0, item);
+  renderThumbs();
 }
 
 /* ---- submit (create or update) ---- */

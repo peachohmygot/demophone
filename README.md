@@ -10,21 +10,28 @@ and a secure admin panel. **Static frontend** (plain HTML/CSS/JS, no build step)
 
 **Customer storefront**
 - Clean solid-white UI — no logo, no header, no clutter
+- **Thai / English toggle** — remembers the choice; new visitors get Thai unless
+  their browser is set to English
 - Sticky search box + horizontal category tabs (🔥 Hot Hit / 📱 All Products / per brand)
 - Smart grid — **2 per row on mobile, 4 on desktop**
-- Brand & Model filters + a **Sort** menu (price, discount, model year, condition)
+- Brand & Model filters, **min/max price range**, and a **Sort** menu
+  (price, discount, model year, condition) — with a live “Showing N items” count
 - **Sold-out** cards get a badge, a disabled chat button, and sink to the bottom
 - Product detail page: swipeable image slider (up to 7 photos), strikethrough
   original price, sale price, **“Save … THB”**, model year & condition %
+- **Fullscreen photo viewer** — tap any photo to zoom in and inspect scratches
+  (pinch-zoom, double-tap, drag to pan, swipe between photos, Esc to close)
 - **“Chat on Facebook to Buy”** — copies the product details to the clipboard
   and opens Messenger (`m.me/YourPage`)
 - **🔄 Similar models** section (same brand)
+- Skeleton placeholders while loading + a back-to-top button
 
 **Admin panel** (`/admin.html`)
 - Secure email/password login (Supabase Auth)
 - New/Edit product form with **dependent dropdowns** (brand → models)
 - Model Year, Condition %, **Hot Hit** & **Sold Out** toggles
 - **Automatic image compression** to ~300–500 KB in the browser before upload
+- **Drag to reorder photos** (or ◀ ▶ buttons) — the first photo is the cover
 - Brand & Model management (add / edit / delete)
 
 **Backend**
@@ -44,8 +51,10 @@ admin.html          Admin panel (login + products + categories)
 css/style.css       All styles
 js/config.js        ← YOU EDIT THIS (Supabase keys + Facebook page)
 js/supabase.js      Supabase client + shared helpers
+js/i18n.js          Thai / English text
 js/catalog.js       Catalog logic
 js/product.js       Detail-page logic
+js/lightbox.js      Fullscreen photo zoom viewer
 js/compress.js      Client-side image compression
 js/admin.js         Admin logic
 sql/schema.sql      ← RUN THIS in Supabase (tables, RLS, storage, auto-delete)
@@ -151,6 +160,8 @@ Change the window by editing the `interval '60 days'` inside the
 | Want to change… | Where |
 |---|---|
 | Currency label | `CURRENCY` in `js/config.js` |
+| Wording in Thai / English | `js/i18n.js` |
+| Default language | `detect()` in `js/i18n.js` |
 | Messenger link | `FACEBOOK_PAGE` in `js/config.js` |
 | Compression target size | `TARGET_MIN` / `TARGET_MAX` in `js/compress.js` |
 | Auto-delete window | `interval '60 days'` in `sql/schema.sql` |

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
@@ -12,7 +12,7 @@
 
     <!-- Search -->
     <div class="searchbar">
-      <input id="search" type="text" placeholder="Search phones…" autocomplete="off" />
+      <input id="search" type="text" autocomplete="off" />
     </div>
 
     <!-- Category tabs (built by JS) -->
@@ -20,30 +20,42 @@
 
     <!-- Filters + sort -->
     <div class="controls">
-      <select id="filterBrand"><option value="">Brand</option></select>
-      <select id="filterModel"><option value="">Model</option></select>
+      <select id="filterBrand"></select>
+      <select id="filterModel"></select>
+
+      <div class="price-range">
+        <input type="number" id="priceMin" min="0" />
+        <span>–</span>
+        <input type="number" id="priceMax" min="0" />
+      </div>
+
       <div class="sort-wrap">
-        <button id="sortBtn">↕ Sort</button>
+        <button id="sortBtn"></button>
         <div class="sort-menu" id="sortMenu">
-          <button data-sort="newest"        class="active">Default (Newest)</button>
-          <button data-sort="price_asc">Price: Low → High</button>
-          <button data-sort="price_desc">Price: High → Low</button>
-          <button data-sort="disc_desc">Discount: Highest</button>
-          <button data-sort="disc_asc">Discount: Lowest</button>
-          <button data-sort="year_desc">Model Year: Newest</button>
-          <button data-sort="year_asc">Model Year: Oldest</button>
-          <button data-sort="cond_desc">Condition: Best</button>
-          <button data-sort="cond_asc">Condition: Lowest</button>
+          <button data-sort="newest" class="active"></button>
+          <button data-sort="price_asc"></button>
+          <button data-sort="price_desc"></button>
+          <button data-sort="disc_desc"></button>
+          <button data-sort="disc_asc"></button>
+          <button data-sort="year_desc"></button>
+          <button data-sort="year_asc"></button>
+          <button data-sort="cond_desc"></button>
+          <button data-sort="cond_asc"></button>
         </div>
       </div>
+
+      <button id="langToggle" class="lang-btn"></button>
     </div>
+
+    <div class="result-count" id="count"></div>
 
     <!-- Products -->
     <div id="grid" class="grid"></div>
-    <div id="status" class="spinner">Loading…</div>
+    <div id="status" class="hidden"></div>
 
   </div>
 
+  <button id="toTop" class="to-top" aria-label="Back to top">↑</button>
   <div class="toast" id="toast"></div>
   <script type="module" src="./js/catalog.js"></script>
 </body>

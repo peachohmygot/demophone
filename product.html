@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
@@ -9,10 +9,14 @@
 </head>
 <body>
   <div class="wrap">
-    <a class="back" href="./index.html">← Back</a>
+    <div class="detail-top">
+      <a class="back" href="./index.html" id="backLink"></a>
+      <button id="langToggle" class="lang-btn"></button>
+    </div>
     <div id="detail"></div>
-    <div id="status" class="spinner">Loading…</div>
+    <div id="status" class="spinner"></div>
   </div>
+  <button id="toTop" class="to-top" aria-label="Back to top">↑</button>
   <div class="toast" id="toast"></div>
   <script type="module" src="./js/product.js"></script>
 </body>
