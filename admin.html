@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Phone Catalog</title>
+  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠️</text></svg>" />
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- LOGIN -->
+    <div id="loginView">
+      <div class="login-card">
+        <h1>🔒 Admin Login</h1>
+        <form id="loginForm">
+          <label>Email</label>
+          <input type="email" id="email" required autocomplete="username" />
+          <label>Password</label>
+          <input type="password" id="password" required autocomplete="current-password" />
+          <div id="loginError" class="muted" style="color:#e11900;margin:10px 0 0"></div>
+          <div style="height:16px"></div>
+          <button class="btn block" type="submit">Sign in</button>
+        </form>
+        <p class="muted" style="margin-top:16px;text-align:center">
+          Create this user in Supabase → Authentication → Users.
+        </p>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="appView" class="hidden">
+      <div class="admin-header">
+        <h1>🛠️ Admin</h1>
+        <div class="admin-nav">
+          <button data-view="products" class="active">Products</button>
+          <button data-view="categories">Brands &amp; Models</button>
+          <button id="logoutBtn" class="btn light small">Logout</button>
+        </div>
+      </div>
+
+      <!-- PRODUCTS VIEW -->
+      <div id="productsView">
+        <div class="form-card">
+          <h2 id="formTitle">➕ New Product</h2>
+          <form id="productForm">
+            <input type="hidden" id="productId" />
+
+            <label>Title</label>
+            <input type="text" id="title" required placeholder="e.g. iPhone 13 Pro 256GB Graphite" />
+
+            <div class="row2">
+              <div>
+                <label>Brand</label>
+                <select class="field" id="brandSelect" required></select>
+              </div>
+              <div>
+                <label>Model</label>
+                <select class="field" id="modelSelect" required></select>
+              </div>
+            </div>
+
+            <div class="row2">
+              <div>
+                <label>Original price (THB)</label>
+                <input type="number" id="originalPrice" min="0" step="1" placeholder="0" />
+              </div>
+              <div>
+                <label>Sale price</label>
+                <input type="number" id="salePrice" min="0" step="1" required placeholder="0" />
+              </div>
+            </div>
+
+            <div class="row2">
+              <div>
+                <label>Model Year</label>
+                <input type="number" id="releaseYear" min="2000" max="2100" placeholder="e.g. 2021" />
+              </div>
+              <div>
+                <label>Condition %</label>
+                <input type="number" id="conditionPercent" min="0" max="100" value="100" required />
+              </div>
+            </div>
+
+            <label>Description</label>
+            <textarea id="description" placeholder="Notes, included accessories, flaws…"></textarea>
+
+            <div class="checks">
+              <label><input type="checkbox" id="isHotHit" /> 🔥 Hot Hit</label>
+              <label><input type="checkbox" id="isSold" /> Sold Out</label>
+            </div>
+
+            <label>Images (up to 7 — auto-compressed to ~300–500 KB)</label>
+            <input type="file" id="imageInput" accept="image/*" multiple />
+            <div class="muted" id="imageHint">Existing images are kept unless you remove them.</div>
+            <div class="thumbs" id="thumbs"></div>
+
+            <div style="display:flex;gap:10px;margin-top:14px">
+              <button class="btn" type="submit" id="saveBtn">Save product</button>
+              <button class="btn light hidden" type="button" id="cancelEdit">Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="list-card">
+          <h2>All Products</h2>
+          <div style="overflow-x:auto">
+            <table class="tbl" id="productsTable">
+              <thead>
+                <tr><th></th><th>Title</th><th>Price</th><th>Cond.</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CATEGORIES VIEW -->
+      <div id="categoriesView" class="hidden">
+        <div class="row2" style="align-items:start">
+          <div class="form-card">
+            <h2>Brands</h2>
+            <form id="brandForm" style="display:flex;gap:8px">
+              <input type="text" id="brandName" placeholder="New brand" required />
+              <button class="btn" type="submit">Add</button>
+            </form>
+            <table class="tbl" id="brandsTable" style="margin-top:14px"><tbody></tbody></table>
+          </div>
+
+          <div class="form-card">
+            <h2>Models</h2>
+            <form id="modelForm">
+              <label>Brand</label>
+              <select class="field" id="modelBrandSelect" required></select>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <input type="text" id="modelName" placeholder="New model" required />
+                <button class="btn" type="submit">Add</button>
+              </div>
+            </form>
+            <table class="tbl" id="modelsTable" style="margin-top:14px"><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script type="module" src="./js/admin.js"></script>
+</body>
+</html>

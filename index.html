@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+  <title>Phone Catalog</title>
+  <link rel="stylesheet" href="./css/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📱</text></svg>" />
+</head>
+<body>
+  <div class="wrap">
+
+    <!-- Search -->
+    <div class="searchbar">
+      <input id="search" type="text" placeholder="Search phones…" autocomplete="off" />
+    </div>
+
+    <!-- Category tabs (built by JS) -->
+    <div class="tabs" id="tabs"></div>
+
+    <!-- Filters + sort -->
+    <div class="controls">
+      <select id="filterBrand"><option value="">Brand</option></select>
+      <select id="filterModel"><option value="">Model</option></select>
+      <div class="sort-wrap">
+        <button id="sortBtn">↕ Sort</button>
+        <div class="sort-menu" id="sortMenu">
+          <button data-sort="newest"        class="active">Default (Newest)</button>
+          <button data-sort="price_asc">Price: Low → High</button>
+          <button data-sort="price_desc">Price: High → Low</button>
+          <button data-sort="disc_desc">Discount: Highest</button>
+          <button data-sort="disc_asc">Discount: Lowest</button>
+          <button data-sort="year_desc">Model Year: Newest</button>
+          <button data-sort="year_asc">Model Year: Oldest</button>
+          <button data-sort="cond_desc">Condition: Best</button>
+          <button data-sort="cond_asc">Condition: Lowest</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Products -->
+    <div id="grid" class="grid"></div>
+    <div id="status" class="spinner">Loading…</div>
+
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script type="module" src="./js/catalog.js"></script>
+</body>
+</html>
