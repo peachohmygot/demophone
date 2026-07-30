@@ -83,9 +83,11 @@ function formatMainSheet() {
   sh.getRange('P3').setFormula('=ARRAYFORMULA(IF(N3:N="","", N3:N/12))');
   sh.getRange('Q3').setFormula('=ARRAYFORMULA(IF(N3:N="","", N3:N/18))');
 
-  // --- 5) ตรึงแถว / คอลัมน์ ------------------------------------------------
+  // --- 5) ตรึงแถว ----------------------------------------------------------
   sh.setFrozenRows(2);
-  sh.setFrozenColumns(3);
+  // หมายเหตุ: ไม่ตรึงคอลัมน์ เพราะหัวตารางมีเซลล์ที่ผสาน (merge) คร่อมอยู่
+  // ถ้าเรียก setFrozenColumns(3) จะขึ้น error
+  // "Cannot freeze columns containing only a portion of a merged cell"
 
   // --- 6) Drop-down --------------------------------------------------------
   // ใส่ก่อนแทรกแถวคั่น เพราะแถวคั่นต้องถูกล้าง validation ทีหลัง
