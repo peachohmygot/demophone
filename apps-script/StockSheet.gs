@@ -1,167 +1,272 @@
 /**
  * ============================================================================
- *  สคริปต์จัดการชีตเครื่อง DEMO — มี 2 ส่วน
+ *  สคริปต์ชีตเครื่อง DEMO — เวอร์ชัน "ดูอย่างเดียว"
  *
- *  PART 1: จัดรูปแบบชีตหลัก 'รวม'
- *  PART 2: สร้างหน้าค้นหา 'ดึงข้อมูลขอรูป'
+ *  แนวคิด: ไม่แตะชีต 'รวม' เลย
+ *  ชีต 'รวม' = คลังข้อมูลจริง เก็บไว้เฉยๆ ไม่เรียง ไม่แทรกแถว ไม่ใส่ dropdown
+ *  หน้าที่สร้างใหม่ = ดึงข้อมูลมาแสดงด้วยสูตร เลือกวิธีเรียงได้ กดเปลี่ยนได้ทันที
  *
- *  ⚠️  คอลัมน์ A = Photo ID ของจริง
- *      สคริปต์นี้ไม่มีคำสั่งเขียนลงคอลัมน์ A แม้แต่บรรทัดเดียว
- *      ไม่ไล่เลขใหม่ ไม่เขียนทับ
- *      ตอนเรียงข้อมูลจะเรียง "ทั้งแถวพร้อมกันทุกคอลัมน์"
- *      ID ในคอลัมน์ A จึงติดไปกับแถวของมันเสมอ
+ *  มี 3 คำสั่งในเมนู:
+ *    1. หน้าดูข้อมูล      -> 'ดูข้อมูล'         เลือกเรียง/กรองสาขา/กรองยี่ห้อ
+ *    2. หน้าขอรูป         -> 'ดึงข้อมูลขอรูป'    พิมพ์เลขลำดับแล้วได้ข้อความก๊อป
+ *    3. ล้างของรกในชีตรวม -> ลบ dropdown กับแถวว่างที่สคริปต์เก่าใส่ไว้
+ *
+ *  ⚠️ ไม่มีคำสั่งเขียนทับข้อมูลในชีต 'รวม' แม้แต่บรรทัดเดียว
  *
  *  วิธีใช้: Extensions > Apps Script > วางทับ > Save > รีเฟรชชีต
- *          จะมีเมนู "⚙️ จัดการสต๊อก" ขึ้นบนแถบเมนู (สั่งจาก iPad ได้เลย)
  * ============================================================================
  */
 
-var SRC_SHEET = 'รวม';                 // ชีตข้อมูลหลัก
-var OUT_SHEET = 'ดึงข้อมูลขอรูป';       // ชีตหน้าค้นหา
-var START_ROW = 3;                     // ข้อมูลเริ่มแถวที่ 3 (แถว 1-2 = หัวตาราง)
+var SRC_SHEET  = 'รวม';
+var VIEW_SHEET = 'ดูข้อมูล';
+var OUT_SHEET  = 'ดึงข้อมูลขอรูป';
+var START_ROW  = 3;
+
+/* ตัวเลือกการเรียง — ชื่อที่แสดง กับ คำสั่งเรียงจริง
+ * Col2=ยี่ห้อ  Col3=รุ่น  Col7=สาขา  Col8=วันที่  Col12=ราคา            */
+var SORTS = [
+  ['① วันที่  เก่า → ใหม่',            'Col8 asc'],
+  ['② วันที่  ใหม่ → เก่า',            'Col8 desc'],
+  ['③ ราคา  ถูก → แพง',              'Col12 asc'],
+  ['④ ราคา  แพง → ถูก',              'Col12 desc'],
+  ['⑤ รุ่น  (A→Z) + วันที่เก่าก่อน',    'Col3 asc, Col8 asc'],
+  ['⑥ รุ่น  (A→Z) + ราคาถูกก่อน',      'Col3 asc, Col12 asc'],
+  ['⑦ ยี่ห้อ → รุ่น → ราคา',           'Col2 asc, Col3 asc, Col12 asc'],
+  ['⑧ สาขา → รุ่น',                   'Col7 asc, Col3 asc']
+];
+
+var BRANCHES = ['ทั้งหมด', 'สต๊อก', 'มวกเหล็ก', 'แก่งคอย', 'หนองแค', 'โลตัส'];
+var BRANDS   = ['ทั้งหมด', 'APPLE', 'IPHONE', 'HUAWEI', 'OPPO', 'REAL ME',
+                'SAMSUNG', 'VIVO', 'XIAOMI', 'MI', 'ALLDOCUBE'];
+
+var HEADERS  = ['ลำดับ', 'ยี่ห้อ', 'รุ่น', 'สี', 'ความจุ',
+                'เครือข่าย', 'สาขา', 'วันที่รับ', 'ราคาขาย'];
+var WIDTHS   = [60, 95, 180, 95, 90, 75, 95, 105, 100];
 
 
 /* ---------------------------------------------------------------------------
- * เมนูบนหน้าชีต
+ * เมนู
  * ------------------------------------------------------------------------- */
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('⚙️ จัดการสต๊อก')
-    .addItem('▶️  รันทั้งหมด (Part 1 + 2)', 'runAll')
+    .addItem('▶️  สร้างใหม่ทั้งหมด', 'runAll')
     .addSeparator()
-    .addItem('1️⃣  จัดรูปแบบชีต รวม', 'formatMainSheet')
-    .addItem('2️⃣  สร้างหน้าดึงข้อมูลขอรูป', 'buildSearchSheet')
+    .addItem('📋  หน้าดูข้อมูล', 'buildViewSheet')
+    .addItem('🔍  หน้าขอรูป', 'buildSearchSheet')
+    .addSeparator()
+    .addItem('🧹  ล้างของรกในชีต รวม', 'cleanUpMainSheet')
     .addToUi();
 }
 
 function runAll() {
-  formatMainSheet();
+  buildViewSheet();
   buildSearchSheet();
-  toast_('เสร็จเรียบร้อยทั้ง 2 ส่วน ✅');
+  toast_('เสร็จเรียบร้อย ✅');
 }
 
 
 /* ===========================================================================
- *  PART 1 — จัดรูปแบบชีต 'รวม'
+ *  หน้าดูข้อมูล 'ดูข้อมูล' — ดูอย่างเดียว เลือกวิธีเรียงได้
  * ========================================================================= */
-function formatMainSheet() {
+function buildViewSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(SRC_SHEET);
-  if (!sh) throw new Error('ไม่พบชีตชื่อ "' + SRC_SHEET + '"');
+  if (!ss.getSheetByName(SRC_SHEET)) throw new Error('ไม่พบชีต "' + SRC_SHEET + '"');
 
-  var lastCol = Math.max(sh.getLastColumn(), 17);   // อย่างน้อยถึงคอลัมน์ Q
+  var sh = resetSheet_(ss, VIEW_SHEET);
+  var S  = "'" + SRC_SHEET + "'!";
 
-  // --- 1) ล้างสูตรใน M:Q ก่อน ---------------------------------------------
-  // จำเป็นมาก: ถ้ายังมี ARRAYFORMULA ค้างอยู่ การ sort ทั้งช่วงจะ error
-  // ว่า "กำลังพยายามแก้ไขบางส่วนของช่วงที่มีสูตรอาร์เรย์"
-  // คอลัมน์ M-Q เป็นสูตรล้วน ลบทิ้งได้ เดี๋ยวใส่กลับหลังเรียงเสร็จ
-  var lastRow = sh.getLastRow();
-  if (lastRow >= START_ROW) {
-    sh.getRange(START_ROW, 13, lastRow - START_ROW + 1, 5).clearContent();
-  }
+  // ------------------------------------------------------------------------
+  // ตารางต้นทาง — บังคับคอลัมน์ A (ลำดับ) และ E (ความจุ) ให้เป็นข้อความ
+  // เพราะสองคอลัมน์นี้มีทั้งตัวเลขและตัวอักษรปนกัน ('2.1' กับ 5, '6/128' กับ 128)
+  // ถ้าไม่แปลง QUERY จะเลือกชนิดข้อมูลที่เจอเยอะกว่า แล้วทำอีกชนิดหายไปเป็นช่องว่าง
+  // ------------------------------------------------------------------------
+  var DATA = '{ARRAYFORMULA(TO_TEXT(' + S + '$A$3:$A)),' + S + '$B$3:$D,' +
+             'ARRAYFORMULA(TO_TEXT(' + S + '$E$3:$E)),' + S + '$F$3:$L}';
 
-  // --- 2) ลบแถวคั่นเก่า ----------------------------------------------------
-  // เพื่อให้รันสคริปต์ซ้ำได้โดยไม่มีแถวว่างสะสม
-  removeBlankRows_(sh, lastCol);
+  // ------------------------------------------------------------------------
+  // แถว 1 = ป้ายชื่อ / แถว 2 = ช่องเลือก
+  // ------------------------------------------------------------------------
+  var labels = [['🔃 เรียงตาม', 'A1:C1'], ['🏬 สาขา', 'D1:E1'],
+                ['📱 ยี่ห้อ', 'F1:G1'], ['📊 สรุป', 'H1:I1']];
+  labels.forEach(function (l) {
+    sh.getRange(l[1]).merge()
+      .setValue(l[0]).setFontWeight('bold').setFontSize(10)
+      .setBackground('#434343').setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  });
+  sh.setRowHeight(1, 26);
 
-  // --- 3) เรียงข้อมูล (สำคัญที่สุด) -----------------------------------------
-  // ครอบทุกคอลัมน์ตั้งแต่ A ถึงคอลัมน์สุดท้าย ทั้งแถวจึงขยับไปพร้อมกัน
-  // คอลัมน์ A ติดไปกับแถวของมันแน่นอน
-  lastRow = sh.getLastRow();
-  if (lastRow > START_ROW) {
-    sh.getRange(START_ROW, 1, lastRow - 2, lastCol).sort([
-      { column: 3,  ascending: true },   // C = รุ่น
-      { column: 8,  ascending: true },   // H = วันที่
-      { column: 12, ascending: true }    // L = ราคา
-    ]);
-  }
+  var ctrl = [['A2:C2', SORTS.map(function (s) { return s[0]; })],
+              ['D2:E2', BRANCHES],
+              ['F2:G2', BRANDS]];
+  ctrl.forEach(function (c) {
+    var rg = sh.getRange(c[0]).merge();
+    rg.setValue(c[1][0])
+      .setBackground('#D9EAD3').setFontSize(12).setFontWeight('bold')
+      .setHorizontalAlignment('center').setVerticalAlignment('middle')
+      .setBorder(true, true, true, true, false, false,
+                 '#38761D', SpreadsheetApp.BorderStyle.SOLID_MEDIUM)
+      .setDataValidation(SpreadsheetApp.newDataValidation()
+        .requireValueInList(c[1], true).setAllowInvalid(false).build());
+  });
 
-  // --- 4) ใส่สูตรกลับเข้าไป ------------------------------------------------
-  sh.getRange('M3').setFormula('=ARRAYFORMULA(IF(L3:L="","", L3:L*0.3))');
-  sh.getRange('N3').setFormula('=ARRAYFORMULA(IF(L3:L="","", L3:L-M3:M))');
-  sh.getRange('O3').setFormula('=ARRAYFORMULA(IF(N3:N="","", N3:N/6))');
-  sh.getRange('P3').setFormula('=ARRAYFORMULA(IF(N3:N="","", N3:N/12))');
-  sh.getRange('Q3').setFormula('=ARRAYFORMULA(IF(N3:N="","", N3:N/18))');
+  sh.getRange('H2:I2').merge()
+    .setFormula('=IF(COUNTA(A4:A)=0,"ไม่พบข้อมูล",' +
+                'COUNTA(A4:A)&" เครื่อง"&CHAR(10)&' +
+                '"รวม "&TEXT(SUM(I4:I),"#,##0")&" บาท")')
+    .setBackground('#FFF2CC').setFontSize(10).setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle')
+    .setWrap(true);
+  sh.setRowHeight(2, 44);
 
-  // --- 5) ตรึงแถว ----------------------------------------------------------
-  sh.setFrozenRows(2);
-  // หมายเหตุ: ไม่ตรึงคอลัมน์ เพราะหัวตารางมีเซลล์ที่ผสาน (merge) คร่อมอยู่
-  // ถ้าเรียก setFrozenColumns(3) จะขึ้น error
-  // "Cannot freeze columns containing only a portion of a merged cell"
+  // ------------------------------------------------------------------------
+  // แถว 3 = หัวตาราง
+  // ------------------------------------------------------------------------
+  sh.getRange(3, 1, 1, HEADERS.length).setValues([HEADERS])
+    .setFontWeight('bold').setFontSize(11)
+    .setBackground('#0B5394').setFontColor('#FFFFFF')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(3, 34);
+  sh.setFrozenRows(3);
 
-  // --- 6) Drop-down --------------------------------------------------------
-  // ใส่ก่อนแทรกแถวคั่น เพราะแถวคั่นต้องถูกล้าง validation ทีหลัง
-  var vRows = sh.getMaxRows() - START_ROW + 1;
+  // ------------------------------------------------------------------------
+  // แถว 4 = สูตรดึงข้อมูล (เรียง + กรอง ตามช่องด้านบน)
+  // ------------------------------------------------------------------------
+  var sw = 'SWITCH($A$2';
+  SORTS.forEach(function (s) { sw += ',"' + s[0] + '","' + s[1] + '"'; });
+  sw += ',"Col8 asc")';
 
-  var brandRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['APPLE', 'HUAWEI', 'OPPO', 'REAL ME', 'SAMSUNG',
-                         'VIVO', 'XIAOMI', 'MI', 'ALLDOCUBE'], true)
-    .setAllowInvalid(true)
-    .build();
-  sh.getRange(START_ROW, 2, vRows, 1).setDataValidation(brandRule);
+  sh.getRange('A4').setFormula(
+    '=IFERROR(QUERY(' + DATA + ',' +
+      '"select Col1,Col2,Col3,Col4,Col5,Col6,Col7,Col8,Col12 ' +
+      'where Col3 is not null"' +
+      '&IF($D$2="ทั้งหมด",""," and Col7 = \'"&$D$2&"\'")' +
+      '&IF($F$2="ทั้งหมด",""," and Col2 = \'"&$F$2&"\'")' +
+      '&" order by "&' + sw + ',0),' +
+    '"— ไม่พบเครื่องตามเงื่อนไขที่เลือก —")');
 
-  var branchRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['สต๊อก', 'มวกเหล็ก', 'แก่งคอย', 'หนองแค', 'โลตัส'], true)
-    .setAllowInvalid(true)
-    .build();
-  sh.getRange(START_ROW, 7, vRows, 1).setDataValidation(branchRule);
+  // ------------------------------------------------------------------------
+  // รูปแบบตัวเลข / ความกว้าง / สีสลับแถว
+  // ------------------------------------------------------------------------
+  var body = sh.getMaxRows() - 3;
+  sh.getRange(4, 1, body, 1).setNumberFormat('@').setHorizontalAlignment('center');
+  sh.getRange(4, 8, body, 1).setNumberFormat('dd/MM/yyyy').setHorizontalAlignment('center');
+  sh.getRange(4, 9, body, 1).setNumberFormat('#,##0').setHorizontalAlignment('right');
+  sh.getRange(4, 4, body, 4).setHorizontalAlignment('center');
+  sh.getRange(4, 1, body, HEADERS.length).setFontSize(11).setVerticalAlignment('middle');
 
-  // --- 7) สีตามเงื่อนไข -----------------------------------------------------
-  sh.clearConditionalFormatRules();
+  for (var i = 0; i < WIDTHS.length; i++) sh.setColumnWidth(i + 1, WIDTHS[i]);
 
-  var gRange = sh.getRange(START_ROW, 7, vRows, 1);   // G = สาขา
-  var hRange = sh.getRange(START_ROW, 8, vRows, 1);   // H = วันที่
+  var all = sh.getRange(4, 1, body, HEADERS.length);
+  var gCol = sh.getRange(4, 7, body, 1);
 
   sh.setConditionalFormatRules([
+    // ค้างเกิน 1 ปี = ทั้งแถวแดงอ่อน (กฎแรกชนะ)
     SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo('มวกเหล็ก')
-      .setBackground('#CFE2F3')                       // ฟ้าอ่อน
-      .setRanges([gRange]).build(),
-
+      .whenFormulaSatisfied('=AND($H4<>"",$H4<TODAY()-365)')
+      .setBackground('#F4CCCC').setRanges([all]).build(),
+    // สาขา
     SpreadsheetApp.newConditionalFormatRule()
-      .whenTextEqualTo('แก่งคอย')
-      .setBackground('#D9EAD3')                       // เขียวอ่อน
-      .setRanges([gRange]).build(),
-
+      .whenTextEqualTo('มวกเหล็ก').setBackground('#CFE2F3')
+      .setRanges([gCol]).build(),
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied('=AND($H3<>"", $H3<TODAY()-365)')
-      .setBackground('#F4CCCC')                       // แดงอ่อน = ค้างเกิน 1 ปี
-      .setRanges([hRange]).build()
+      .whenTextEqualTo('แก่งคอย').setBackground('#D9EAD3')
+      .setRanges([gCol]).build(),
+    // สลับสีแถวคู่ ให้กวาดตาตามง่าย
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied('=AND($A4<>"",ISEVEN(ROW()))')
+      .setBackground('#F5F5F5').setRanges([all]).build()
   ]);
 
-  // --- 8) แทรกแถวคั่นเวลารุ่น (คอลัมน์ C) เปลี่ยน ---------------------------
-  // ไล่จากล่างขึ้นบน เพื่อไม่ให้ตำแหน่งแถวที่ยังไม่ทำเลื่อน
-  lastRow = sh.getLastRow();
-  if (lastRow > START_ROW) {
-    var n = lastRow - START_ROW + 1;
-    var models = sh.getRange(START_ROW, 3, n, 1).getValues();
+  // ------------------------------------------------------------------------
+  // ล็อกไม่ให้แก้ ยกเว้น 3 ช่องเลือกด้านบน
+  // ------------------------------------------------------------------------
+  try {
+    var p = sh.protect().setDescription('หน้าดูอย่างเดียว');
+    p.setUnprotectedRanges([sh.getRange('A2:G2')]);
+    p.setWarningOnly(true);
+  } catch (e) { /* ล็อกไม่ได้ก็ไม่เป็นไร ไม่ต้องหยุดสคริปต์ */ }
 
-    for (var i = n - 1; i > 0; i--) {
-      if (String(models[i][0]).trim() === String(models[i - 1][0]).trim()) continue;
+  ss.setActiveSheet(sh);
+  toast_('สร้างหน้า ' + VIEW_SHEET + ' เรียบร้อย ✅');
+}
 
-      var row = START_ROW + i;
-      sh.insertRowBefore(row);
 
-      var sep = sh.getRange(row, 1, 1, lastCol);
-      sep.setBackground('#F3F3F3');
-      sep.clearDataValidations();
-    }
-  }
+/* ===========================================================================
+ *  หน้าขอรูป 'ดึงข้อมูลขอรูป'
+ * ========================================================================= */
+function buildSearchSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss.getSheetByName(SRC_SHEET)) throw new Error('ไม่พบชีต "' + SRC_SHEET + '"');
 
-  // --- 9) ความสูงแถว 35px + จัดกลางแนวตั้ง (กดง่ายบน iPad) -----------------
-  lastRow = sh.getLastRow();
-  if (lastRow >= START_ROW) {
-    var rows = lastRow - START_ROW + 1;
-    sh.setRowHeights(START_ROW, rows, 35);
-    sh.getRange(START_ROW, 1, rows, lastCol).setVerticalAlignment('middle');
-  }
+  var sh = resetSheet_(ss, OUT_SHEET);
 
-  toast_('จัดรูปแบบชีต ' + SRC_SHEET + ' เรียบร้อย ✅');
+  sh.getRange('A1')
+    .setValue('พิมพ์เลขลำดับเครื่องที่นี่ ⬇️')
+    .setFontWeight('bold').setFontSize(14)
+    .setBackground('#FFF2CC')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sh.setRowHeight(1, 42);
+
+  sh.getRange('A2')
+    .setBackground('#D9EAD3').setFontSize(16).setFontWeight('bold')
+    .setHorizontalAlignment('center').setVerticalAlignment('middle')
+    .setBorder(true, true, true, true, false, false,
+               '#666666', SpreadsheetApp.BorderStyle.SOLID_THICK);
+  sh.setRowHeight(2, 52);
+
+  var S = "'" + SRC_SHEET + "'!";
+  var table = '{ARRAYFORMULA(TO_TEXT(' + S + '$A$3:$A)),' + S + '$B$3:$L}';
+
+  sh.getRange('A4').setFormula(
+    '=IF($A$2="","",LET(' +
+      'k, TO_TEXT($A$2),' +
+      't, ' + table + ',' +
+      'IFERROR(' +
+        '"รบกวนขอรูปเครื่องเพื่ออัพลงเว็บหน่อยครับ"&CHAR(10)&' +
+        '"📌 ลำดับเครื่อง: "&VLOOKUP(k,t,1,FALSE)&CHAR(10)&' +
+        '"📱 ยี่ห้อ/รุ่น: "&VLOOKUP(k,t,2,FALSE)&" "&VLOOKUP(k,t,3,FALSE)&CHAR(10)&' +
+        '"🎨 สี: "&VLOOKUP(k,t,4,FALSE)&" (ความจุ "&VLOOKUP(k,t,5,FALSE)&")"&CHAR(10)&' +
+        '"🔢 IMEI: "&VLOOKUP(k,t,9,FALSE)&CHAR(10)&' +
+        '"💰 ราคาขาย: "&TEXT(VLOOKUP(k,t,12,FALSE),"#,##0")&" บาท",' +
+        '"❌ ไม่พบลำดับ "&$A$2&" ในชีต ' + SRC_SHEET + '"' +
+      ')))')
+    .setFontSize(12).setVerticalAlignment('top')
+    .setHorizontalAlignment('left').setWrap(true);
+  sh.setRowHeight(4, 180);
+
+  sh.setColumnWidth(1, 450);
+
+  ss.setActiveSheet(sh);
+  sh.getRange('A2').activate();
+  toast_('สร้างหน้า ' + OUT_SHEET + ' เรียบร้อย ✅');
+}
+
+
+/* ===========================================================================
+ *  ล้างของรกในชีต 'รวม' ที่สคริปต์เก่าใส่ไว้
+ *  - ลบ drop-down ทั้งหมด (ต้นเหตุที่ดูเหมือนช่องให้แก้ข้อมูล)
+ *  - ลบแถวว่างที่แทรกคั่นไว้
+ *  ไม่แตะข้อมูลจริงแม้แต่ช่องเดียว
+ * ========================================================================= */
+function cleanUpMainSheet() {
+  var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SRC_SHEET);
+  if (!sh) throw new Error('ไม่พบชีต "' + SRC_SHEET + '"');
+
+  var lastCol = Math.max(sh.getLastColumn(), 17);
+
+  sh.getRange(START_ROW, 1, sh.getMaxRows() - START_ROW + 1, lastCol)
+    .clearDataValidations();
+
+  removeBlankRows_(sh, lastCol);
+
+  toast_('ล้างชีต ' + SRC_SHEET + ' เรียบร้อย ✅');
 }
 
 
 /**
- * ลบเฉพาะแถวที่ "ว่างทั้งแถว" (A ถึงคอลัมน์สุดท้าย)
+ * ลบเฉพาะแถวที่ว่างทั้งแถว (A ถึงคอลัมน์สุดท้าย)
  * ไม่แตะแถวที่มีข้อมูลแม้แต่ช่องเดียว และไม่ลบแถวแรกของข้อมูล
  */
 function removeBlankRows_(sh, lastCol) {
@@ -179,91 +284,37 @@ function removeBlankRows_(sh, lastCol) {
 
     if (blank && end < 0) end = i;
     if (!blank && end >= 0) {
-      sh.deleteRows(START_ROW + i + 1, end - i);   // ลบทีละกลุ่มที่ติดกัน
+      sh.deleteRows(START_ROW + i + 1, end - i);
       end = -1;
     }
   }
 }
 
 
-/* ===========================================================================
- *  PART 2 — สร้างหน้าค้นหา 'ดึงข้อมูลขอรูป'
- * ========================================================================= */
-function buildSearchSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-
-  var sh = ss.getSheetByName(OUT_SHEET);
-  if (sh) {
-    sh.clear();
-    sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns()).clearDataValidations();
-    sh.clearConditionalFormatRules();
-  } else {
-    sh = ss.insertSheet(OUT_SHEET);
-  }
-
-  // --- A1: ป้ายหัวเรื่อง ---------------------------------------------------
-  sh.getRange('A1')
-    .setValue('พิมพ์เลขลำดับเครื่องที่นี่ ⬇️')
-    .setFontWeight('bold')
-    .setFontSize(14)
-    .setBackground('#FFF2CC')
-    .setHorizontalAlignment('center')
-    .setVerticalAlignment('middle');
-  sh.setRowHeight(1, 42);
-
-  // --- A2: ช่องกรอก --------------------------------------------------------
-  sh.getRange('A2')
-    .setBackground('#D9EAD3')
-    .setFontSize(16)
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center')
-    .setVerticalAlignment('middle')
-    .setBorder(true, true, true, true, false, false,
-               '#666666', SpreadsheetApp.BorderStyle.SOLID_THICK);
-  sh.setRowHeight(2, 52);
-
-  // --- A4: ข้อความผลลัพธ์ --------------------------------------------------
-  var S = "'" + SRC_SHEET + "'!";
-
-  // ตารางค้นหาแปลงคอลัมน์ A เป็นข้อความก่อน
-  // เพื่อให้ค้นเจอทั้งกรณี ID เก็บเป็นตัวเลข (5) และเป็นข้อความ ("2.1")
-  var table = '{ARRAYFORMULA(TO_TEXT(' + S + '$A$3:$A)),' + S + '$B$3:$L}';
-
-  var formula =
-    '=IF($A$2="","",LET(' +
-      'k, TO_TEXT($A$2),' +
-      't, ' + table + ',' +
-      'IFERROR(' +
-        '"รบกวนขอรูปเครื่องเพื่ออัพลงเว็บหน่อยครับ"&CHAR(10)&' +
-        '"📌 ลำดับเครื่อง: "&VLOOKUP(k,t,1,FALSE)&CHAR(10)&' +
-        '"📱 ยี่ห้อ/รุ่น: "&VLOOKUP(k,t,2,FALSE)&" "&VLOOKUP(k,t,3,FALSE)&CHAR(10)&' +
-        '"🎨 สี: "&VLOOKUP(k,t,4,FALSE)&" (ความจุ "&VLOOKUP(k,t,5,FALSE)&")"&CHAR(10)&' +
-        '"🔢 IMEI: "&VLOOKUP(k,t,9,FALSE)&CHAR(10)&' +
-        '"💰 ราคาขาย: "&TEXT(VLOOKUP(k,t,12,FALSE),"#,##0")&" บาท",' +
-        '"❌ ไม่พบลำดับ "&$A$2&" ในชีต ' + SRC_SHEET + '"' +
-      ')))';
-
-  sh.getRange('A4')
-    .setFormula(formula)
-    .setFontSize(12)
-    .setVerticalAlignment('top')
-    .setHorizontalAlignment('left')
-    .setWrap(true);
-  sh.setRowHeight(4, 180);
-
-  // --- ความกว้างคอลัมน์ 450px ให้อ่านสวยบน iPad ----------------------------
-  sh.setColumnWidth(1, 450);
-
-  ss.setActiveSheet(sh);
-  sh.getRange('A2').activate();   // เคอร์เซอร์รออยู่ที่ช่องกรอกเลย
-
-  toast_('สร้างหน้า ' + OUT_SHEET + ' เรียบร้อย ✅');
-}
-
-
 /* ---------------------------------------------------------------------------
  * ตัวช่วย
  * ------------------------------------------------------------------------- */
+
+/** สร้างชีตใหม่ หรือถ้ามีอยู่แล้วก็ล้างให้เกลี้ยง (รวมทั้ง merge / ล็อก / สี) */
+function resetSheet_(ss, name) {
+  var sh = ss.getSheetByName(name);
+  if (!sh) return ss.insertSheet(name);
+
+  var prots = sh.getProtections(SpreadsheetApp.ProtectionType.SHEET);
+  for (var i = 0; i < prots.length; i++) {
+    if (prots[i].canEdit()) prots[i].remove();
+  }
+
+  var all = sh.getRange(1, 1, sh.getMaxRows(), sh.getMaxColumns());
+  all.breakApart();
+  all.clearDataValidations();
+  sh.clearConditionalFormatRules();
+  sh.setFrozenRows(0);
+  sh.clear();
+
+  return sh;
+}
+
 function toast_(msg) {
   SpreadsheetApp.getActiveSpreadsheet().toast(msg, 'จัดการสต๊อก', 5);
 }
